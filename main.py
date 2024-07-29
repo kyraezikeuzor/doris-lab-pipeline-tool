@@ -1,17 +1,26 @@
-# samtools-1.9, seqtk, fatotwobit,blat,blatSrc,
-# have a folder created with a sample bam file in it
-# also have IGHG1_SHRA3.fasta file
+# Antibuddy: Doris Lab IG Pipeline Tool
 import subprocess
 import os
 from spinner import Spinner
 from utils import check_tool_availability
 from utils import create_file
 
+'''
+Requirements
+- samtools-1.9
+- seqtk
+- fatotwobit
+- blat
+- blatSrc
+- Folder with a bam file inside
+- Strain specific target file
+'''
 
-# GLOBAL VARIABLES
+# Global Variables
 strain_specific_target_options = []
+identifierStarter = "m84248"
 
-# GET STRAIN SPECIFIC TARGET OPTIONS
+# Get strain specific target options
 def set_target_options():
     global strain_specific_target_options
 
@@ -28,20 +37,17 @@ def set_target_options():
     except Exception as e:
         print(f"An error occurred while reading the file: {e}")
 
-
-# CAPTURE GLOBAL FATOTWOBIT SCRIPT PATH
+# Capture global faToTwoBit script path
 def set_fatotwobit_script(script_path):
     global fatotwobit_script
     fatotwobit_script = script_path
 
-
-# CAPTURE GLOBAL BLAT SCRIPT PATH
+# Capture global blat script path
 def set_blat_script(script_path):
     global blat_script
     blat_script = script_path
 
-
-# CONVERT BAM FILE TO FASTA FILE
+# Convert bam file to fasta file
 def convert_bam_to_fasta(in_file, out_file):
     # Command Usage: samtools fasta STC654_Bio_Sample_8_flnc.bam > STC654_Bio_Sample_8_flnc.fasta
     
@@ -67,8 +73,7 @@ def convert_bam_to_fasta(in_file, out_file):
         # Close spinner
         spinner.stop()
     
-
-# SPLIT FASTA FILE INTO 10 MINI FILES
+# Split fasta file into 10 mini fiels
 def split_fasta_file(in_file, out_file):
     # Command Usage: seqkt split -n 10 STC654_Bio_Sample_8_flnc  STC654_Bio_Sample_8_flnc.fasta
     
@@ -94,8 +99,7 @@ def split_fasta_file(in_file, out_file):
         # Close spinner
         spinner.stop()
 
-
-# INDEX EACH SMALLER FASTA FILE WITH FATOTWOBIT
+# Index each smaller fasta file with faToTwoBit
 def index_fasta_file(in_file, out_file):
     # Command Usage: fatotwobit STC654_Bio_Sample_8_flnc.00001.fasta STC654_Bio_Sample_8_flnc.00001.2bit
     
@@ -108,7 +112,7 @@ def index_fasta_file(in_file, out_file):
 
     try:           
         # Construct the command to be executed
-        command = [fatotwobit_script, "fatotwobit", in_file, out_file]
+        command = [fatotwobit_script, in_file, out_file]
         
         # Run the command
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -118,14 +122,13 @@ def index_fasta_file(in_file, out_file):
 
     except subprocess.CalledProcessError as e:
         # Print the error message if the command fails
-        print('\n' + "\n❌ Error running faToTwoBit:" + e.stderr.decode() + '\n')
+        print('\n' + "\n❌ Error running faToTwoBit: " + e.stderr.decode() + '\n')
 
     finally:
         # Close spinner
         spinner.stop()
 
-
-# EXTRACT SEQUENCES OF INTEREST WITH BLAT
+# Extract sequences of interest with blat
 def extract_sequences_of_interest(database_file, query_file, output_file):
     # Command Usage: blat STC654_Bio_Sample_8_flnc.00001.2bit SHRA3_IGHG1.txt -out=blast STC654_Bio_Sample_8_IGHG1.00001.txt
 
@@ -151,54 +154,93 @@ def extract_sequences_of_interest(database_file, query_file, output_file):
         # Close spinner
         spinner.stop()
 
-
-# GRAB ONLY THE IDENTIFIERS FOR READS
+# Grab only the identifiers for reads
 def extract_identifiers(filename):
-    # Going into the strain target text file and only extracting the sequences
+    # This function goes into the strain target text file and only extracts the sequences with highest score
+
+    # Define helper functions
+    def get_sequence_score(line):
+        if line.startswith(identifierStarter):
+            recording = False
+            startIndex = 0
+            endIndex = 0
+            sequenceScore = ''
+
+            for a in range(1, len(line)-1):
+                if line[a-1] == " " and line[a] != " ":
+                    recording = True
+                    startIndex = a
+                    break
+
+            if recording == True:
+                for b in range(startIndex, len(line)-1):
+                    if line[b+1] == " ":
+                        endIndex = b
+                        break
+
+            for c in range(startIndex, endIndex+1):
+                sequenceScore = sequenceScore + line[c]
+ 
+            return int(sequenceScore)
+
+    def get_max_sequence_score(filename):
+        sequenceScores = []
+
+        with open(filename, 'r') as file:
+            for line in file:
+                if line.startswith(identifierStarter):
+                    sequenceScore = get_sequence_score(line)         
+
+                    sequenceScores.append(int(sequenceScore))
+
+        if len(sequenceScores) > 0:
+            sequenceScores.sort()
+
+        return sequenceScores[-1]
+
+    # Define necessary variables
+    maxSequenceScore = get_max_sequence_score(filename)
+    identifiers = []
 
     # Load spinner
     spinner = Spinner("Extracting sequences from identifer files... ", speed=0.1)
     spinner.start()
 
     # Creating identifiers array and adding only sequences from each line
-    identifiers = []
     with open(filename, 'r') as file:
         recording = False
         for line in file:
             sequence = ''
-            if "BLASTN 2.2.11 [blat]" in line:
-                recording = True
-            if recording:
-                if line.startswith("m84248"):
-                    for i in range(0, len(line)-1):
-                        if line[i+1] != " ":
-                            sequence = sequence + line[i]
-                        elif line[i+1] == " ":
-                            sequence = sequence + line[i]
-                            break
-                        
-                    identifiers.append(sequence)
+            sequenceScoreForLine = get_sequence_score(line)
 
+            if line.startswith("m84248") and sequenceScoreForLine == maxSequenceScore:
+                for i in range(0, len(line)-1):
+                    if line[i+1] != " ":
+                        sequence = sequence + line[i]
+                    elif line[i+1] == " ":
+                        sequence = sequence + line[i]
+                        break
+                    
+                identifiers.append(sequence)
+    
     # Close spinner
     spinner.stop()
 
     # Print the command output
-    print("✅ Extracted identifier sequences successfully.")
+    print(f"✅ Extracted sequence idenfifiers from {filename} successfully.")
 
     return identifiers
 
-
-# ADD IDENTIFIERS FROM EACH 0000X.IGHG1 FILE TO .ALL.IGHG1
+# Add identifiers from each 0000X.<strain-specific-target> file to the complete file
 def append_list_of_identifiers(filename, identifiers):
     # Adding copied list of items from each mini ighg1 file to a giant IGHh1 file
     with open(filename, 'a') as file:  # Open the file in append mode
         for identifier in identifiers:
             file.write(identifier + '\n')  # Write each identifier on a new line
     
-    print("\n✅ Added identifiers from " + filename + '\n')
+    print("\n✅ Added identifiers to " + filename + '\n')
 
-
-# USE FASTA IDENTIFIERS TO RETRIEVE SEQUENCES IN THE ORIGINAL RUN THAT MATCH THEM
+# Use fasta identifiers to retrieve sequences in the original run that match them
 def match_sequences(in_file, identifiers_file, out_file):
     # Command Usage: seqtk subseq STC654_Bio_Sample_8_flnc.fasta STC654_Bio_Sample_8_IGHG1.txt > IGHG1_seqs.fasta
     
@@ -225,8 +267,7 @@ def match_sequences(in_file, identifiers_file, out_file):
         # Stop spinner
         spinner.stop()
         
-
-# PERFORMS ENTIRE EXTRACTION PROCESS
+# Performs entire extraction process
 def start():
     # --------------------------- STEP 1 PART 1: GET VARIABLES ---------------------------
     # --------------------------- GET BAM FILE ---------------------------
@@ -283,7 +324,7 @@ def start():
                 set_blat_script(blat_script_path)
                 break
             else:
-                print('\n' + "‼️ Error: The provided path does not exist. Please ensure the path is correct and try again." + '\n')
+                print('\n' + "‼️ Error: The provided path does not exist. Please ensure the path is correct and try again.")
     else:
         print("STEP 4/5: blat was found systemwide.")
     
@@ -302,7 +343,7 @@ def start():
                 set_fatotwobit_script(fatotwobit_script_path)
                 break
             else:
-                print('\n' + "‼️ Error: The provided path does not exist. Please ensure the path is correct and try again." + '\n')
+                print('\n' + "‼️ Error: The provided path does not exist. Please ensure the path is correct and try again.")
         
     else:
         print("STEP 5/5: faToTwoBit was found systemwide.")
@@ -409,8 +450,7 @@ def start():
 
     print("\nProcess complete! 🎉")
 
-
-# PERFORMS SEQUENCE EXTRACTION PROCESS
+# Performs sequence extraction process
 def sequence():
     # --------------------------- STEP 1 PART 1: GET VARIABLES ---------------------------
     # --------------------------- GET BAM FILE ---------------------------
@@ -553,7 +593,7 @@ def sequence():
 
     print("\nProcess complete! 🎉")
 
-
+# Doris Lab IG Pipeline Tool
 def main():
     # --------------------------- CHECK IF TARGET OPTIONS EXISTS ---------------------------
     if len(strain_specific_target_options) > 0:
@@ -599,11 +639,9 @@ def main():
     else: 
         print('\n' + "❌ Error: could not find file targets.txt file with strain specific target options.")
 
-
-
-# SET STRAIN SPECIFIC TARGET OPTIONS GLOBAL ARRAY
+# Set strain specific target options global array
 set_target_options()
 
-# CALL MAIN FUNCTION
+# Call main function
 if __name__ == "__main__":
     main()

@@ -1,4 +1,2 @@
 # doris-lab-ig-pipeline-tool
-
-## Usage
-
+# doris-lab-ig-pipeline-tool

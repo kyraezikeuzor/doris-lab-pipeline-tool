@@ -1,4 +1,4 @@
-# Antibuddy
+# Antibuddy: Doris Lab IG Pipeline Tool
 Automates the data extraction process for the Doris Lab. 
 
 ## Required Tools

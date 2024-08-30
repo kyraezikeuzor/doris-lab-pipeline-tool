@@ -5,17 +5,6 @@ from spinner import Spinner
 from utils import check_tool_availability
 from utils import create_file
 
-'''
-Requirements
-- samtools-1.9
-- seqtk
-- fatotwobit
-- blat
-- blatSrc
-- Folder with a bam file inside
-- Strain specific target file
-'''
-
 # Global Variables
 strain_specific_target_options = []
 identifierStarter = "m84248"
@@ -46,6 +35,12 @@ def set_fatotwobit_script(script_path):
 def set_blat_script(script_path):
     global blat_script
     blat_script = script_path
+
+# Capture global blat script path
+def set_igblast_script(script_path):
+    global igblast_script
+    igblast_script = script_path
+     
 
 # Convert bam file to fasta file
 def convert_bam_to_fasta(in_file, out_file):
@@ -560,8 +555,8 @@ def sequence():
 
         # Create output text file
         step2_part1_txt_filename = f"{step1_sequences_txt_filename_prefix}{step1_strain_specific_target_uppercase}.000{step2_part1_file_number}.txt"
-        step2_part1_txt_file_with_folder = os.path.join(step1_strain_specific_target_uppercase, step2_part1_txt_filename)
-        step2_part1_txt_file = os.path.join(step1_bam_file_folder, step2_part1_txt_file_with_folder)
+        step2_part1_txt_filename_with_folder = os.path.join(step1_strain_specific_target_uppercase, step2_part1_txt_filename)
+        step2_part1_txt_file = os.path.join(step1_bam_file_folder, step2_part1_txt_filename_with_folder)
         
         # Execute extract sequences function
         extract_sequences_of_interest(step2_part1_2bit_file, step1_strain_specific_target_file, step2_part1_txt_file)
@@ -582,40 +577,223 @@ def sequence():
 
     # Create output text file
     step3_seqs_filename = f"{step1_sequences_txt_filename_prefix}{step1_strain_specific_target_uppercase}_seqs.fa"
-    step3_seqs_file_with_folder = os.path.join(step1_strain_specific_target_uppercase, step3_seqs_filename)
-    step3_seqs_file = os.path.join(step1_bam_file_folder, step3_seqs_file_with_folder)
+    step3_seqs_filename_with_folder = os.path.join(step1_strain_specific_target_uppercase, step3_seqs_filename)
+    step3_seqs_file = os.path.join(step1_bam_file_folder, step3_seqs_filename_with_folder)
 
     print(step1_out_file, step1_sequences_txt_file,step3_seqs_file)
     
     # Command Usage: seqtk subseq STC654_Bio_Sample_8_flnc.fasta STC654_Bio_Sample_8_IGHG1.txt > IGHG1_seqs.fasta
     match_sequences(step1_out_file, step1_sequences_txt_file, step3_seqs_file)
 
-
     print("\nProcess complete! 🎉")
 
-# Doris Lab IG Pipeline Tool
+
+def igblast(species="rat"):
+    """
+    Run IgBLAST with specified parameters.
+
+    :param seqsfile: Path to the input sequence file.
+    :param outputfile: Path to the output file.
+    :param species: Species for germline gene database, default is 'rat'.
+    """
+
+    # Get seqs file + Check if seqs file exists
+    while True:
+        seqsfile = input("STEP 1/2: Enter path to the seqs file: ")
+
+        if os.path.exists(seqsfile):
+            break
+        else:
+            print('\n' + f"‼️ Error: The file '{seqsfile}' does not exist." + '\n')
+            seqsfile = input("STEP 1/2: Enter path to seqs file: ")
+    
+    print('\n')
+
+    # --------------------------- GET IGBLAST SCRIPT PATH ---------------------------
+    # Check if blat is available
+    if not check_tool_availability("igblast"):
+        print("STEP 2/2: igblast was not found systemwide.")
+        
+        while True:
+            igblast_script_path = input("STEP 2/2: Enter path to your igblast script (e.g., /condaenv/bin/igblast): ")    
+            
+            if os.path.exists(igblast_script_path):
+                set_igblast_script(igblast_script_path)
+                break
+            else:
+                print('\n' + "‼️ Error: The provided path does not exist. Please ensure the path is correct and try again.")
+    else:
+        print("STEP 2/2: igblast was found systemwide.")
+    
+    print('\n')
+
+    # Generate a dynamic output file name based on the input file name
+    input_base_name = os.path.splitext(seqsfile)[0]  # Remove the file extension
+    outputfile = f"{input_base_name}.AIRR.original.tsv"  # Create the dynamic output file name
+
+
+
+    # Define the IgBLAST parameters based on your input
+    v_gene_database = f"IMGT_{species}_V"
+    d_gene_database = f"IMGT_{species}_D"
+    j_gene_database = f"IMGT_{species}_J"
+    v_mismatch_penalty = -1
+    min_d_gene_matches = 5
+    d_mismatch_penalty = -2
+    min_v_gene_length = 9
+    min_j_gene_length = 0
+    j_mismatch_penalty = -2
+    num_v_gene_alignments = 1
+    num_d_gene_alignments = 1
+    num_j_gene_alignments = 1
+    alignment_format = "AIRR"  # Using AIRR rearrangement tabular format
+
+    # Construct the IgBLAST command
+    igblast_command = [
+        igblast_script,  # IgBLAST executable
+        "-query", seqsfile,  # Input sequence file
+        "-out", outputfile,  # Dynamic output file
+        "-germline_db_V", v_gene_database,
+        "-germline_db_D", d_gene_database,
+        "-germline_db_J", j_gene_database,
+        "-V_penalty", str(v_mismatch_penalty),
+        "-min_D_match", str(min_d_gene_matches),
+        "-D_penalty", str(d_mismatch_penalty),
+        "-min_V_length", str(min_v_gene_length),
+        "-min_J_length", str(min_j_gene_length),
+        "-J_penalty", str(j_mismatch_penalty),
+        "-num_alignments_V", str(num_v_gene_alignments),
+        "-num_alignments_D", str(num_d_gene_alignments),
+        "-num_alignments_J", str(num_j_gene_alignments),
+        "-outfmt", "19",  # Correct AIRR tabular format code
+        "-num_alignments", "10",  # Number of alignments to show
+        "-evalue", "1",  # Expect value threshold for saving hits
+        "-show_translation",  # Show amino acid translation
+        "-domain_system", "imgt",  # V domain delineation system
+        "-extend_align5end",  # Extend alignment at 5' end
+        "-extend_align3end",  # Extend alignment at 3' end
+        "-allow_vdj_overlap"  # Allow V(D)J overlap
+    ]
+
+    # Run the IgBLAST command
+    try:
+        subprocess.run(igblast_command, check=True)
+        print(f"IgBLAST ran successfully. Output saved to {outputfile}.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running IgBLAST: {e}")
+            
+
+import pandas as pd
+
+def immuneref():
+    input_file = input('Enter excel file name: ')  # Replace with your actual file path
+
+    try:
+        # Attempt to read the file as an .xls file using the xlrd engine
+        df = pd.read_excel(input_file, engine='xlrd')
+        print("File read successfully as .xls.")
+    except Exception as e:
+        print(f"Unexpected error reading the Excel file: {e}")
+        return
+
+    # Continue with processing if the file is read successfully
+    print("Processing data...")
+
+    # Step 1: Sort by "Stop codon" and remove rows where "Stop codon" is 'T'
+    df_sorted = df.sort_values(by='stop_codon', ascending=False)
+    df_filtered = df_sorted[df_sorted['stop_codon'] != 'T']
+
+    print(df_filtered)
+
+    # Step 2: Sort by "V alignment end" and remove rows where "V alignment end" < 290
+    df_sorted_v_end = df_filtered.sort_values(by='v_alignment_end', ascending=True)
+    df_filtered_v_end = df_sorted_v_end[df_sorted_v_end['v_alignment_end'] >= 290]
+
+    print(df_filtered)
+
+    # Step 3: Select specific columns and create a new DataFrame
+    selected_columns = ['v_call', 'd_call', 'j_call', 'junction_aa']
+    new_df = df_filtered_v_end[selected_columns]
+
+    # Remove the thing he said to from the v_call, d_call, j_call columns
+    for column in ['v_call', 'd_call', 'j_call']:
+        new_df.loc[:, column] = new_df[column].str.replace(r'\*01', '', regex=True)
+        new_df.loc[:, column] = new_df[column].str.replace(r'\*02', '', regex=True)
+        new_df.loc[:, column] = new_df[column].str.replace(r'\*03', '', regex=True)
+
+    # Ensure all columns used in agg are strings
+    for column in ['v_call', 'd_call', 'j_call', 'junction_aa']:
+        new_df.loc[:,column] = new_df[column].astype(str)
+
+    # Combine columns into a single column
+    new_df.loc[:,'combined'] = new_df[['v_call', 'd_call', 'j_call', 'junction_aa']].agg('-'.join, axis=1)
+
+    # Count frequencies of each unique 'combined' sequence
+    freq_df = new_df['combined'].value_counts().reset_index()
+    freq_df.columns = ['combined', 'counts']
+
+    # Calculate frequencies
+    total_counts = freq_df['counts'].sum()
+    freq_df['freqs'] = freq_df['counts'] / total_counts
+
+    # Expand the 'combined' column back into separate columns
+    expanded_df = freq_df['combined'].str.split('-', expand=True)
+    
+    # Check number of columns created
+    num_columns = expanded_df.shape[1]
+    expected_columns = ['v_call', 'd_call', 'j_call', 'junction_aa']
+    
+    # Adjust column names if the number of columns doesn't match expected
+    if num_columns == len(expected_columns):
+        expanded_df.columns = expected_columns
+    else:
+        print(f"Warning: Expected {len(expected_columns)} columns but got {num_columns}.")
+        # Handle column mismatch (e.g., fill missing columns with NaN or adjust column names)
+        expanded_df.columns = [f'column_{i}' for i in range(num_columns)]
+
+    final_df = pd.concat([expanded_df, freq_df[['freqs']]], axis=1)
+
+    # Determine the new file name and path
+    directory = os.path.dirname(input_file)
+    new_file_name = 'STC654-Bio-Sample-1-IGHG2B_A3_junc_aa_freqs.xlsx'
+    output_file = os.path.join(directory, new_file_name)
+
+    
+    # Save the new DataFrame to the new Excel file
+    with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+        final_df.to_excel(writer, sheet_name='Filtered_Data', index=False)
+
+    print(f"Filtered data has been saved to {output_file}")
+
+
+
+
+# Doris Lab Ig Pipeline Tool
 def main():
     # --------------------------- CHECK IF TARGET OPTIONS EXISTS ---------------------------
     if len(strain_specific_target_options) > 0:
         # --------------------------- INTRODUCTION ---------------------------
         
-        print("\nWelcome to a Doris Lab IG pipeline tool 🔬 \n")
-
         print(
-        '''
-    Task Options:
+'''
+<----- Doris Lab Immunoglobulin Pipeline ----->
 
-    'start':
-    - Performs the entire extraction process from a single bam file.
-    - Completes an extraction of identifers for one strain specific target.
+Choose a task to get started:
 
-    'sequence':
-    - Performs only the extraction of identifiers for one strain specific target.
-    - .2bit and .fa files for each split 1/10 fasta file must be already created from running 'start'.
+'start':
+- Performs the entire extraction process from a single bam file.
+- Completes an extraction of identifers for one strain specific target.
 
-        ''')
+'sequence':
+- Performs only the extraction of identifiers for one strain specific target.
+- .2bit and .fa files for each split 1/10 fasta file must be already created from running 'start'.
 
-        task_options = ['start', 'sequence']
+'igblast':
+- Runs the IgBlast tool for a seqs file
+
+''')
+
+        task_options = ['start', 'sequence', 'igblast', 'immuneref']
 
         while True:
             task = input("CHOOSE TASK: Enter task to perform (case-insensitive): ")
@@ -635,9 +813,14 @@ def main():
             start()
         elif task_lowercase == 'sequence':
             sequence()
+        elif task_lowercase == 'igblast':
+            igblast()
+        elif task_lowercase == 'immuneref':
+            immuneref()
 
     else: 
         print('\n' + "❌ Error: could not find file targets.txt file with strain specific target options.")
+
 
 # Set strain specific target options global array
 set_target_options()

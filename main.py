@@ -21,7 +21,7 @@ def set_target_options():
             strain_specific_target_options = [line.strip().upper() for line in file.readlines()]
     
     except FileNotFoundError:
-        print("\n❌ The file targets.txt was not found. ")
+        print("\n[Error] The file targets.txt was not found. ")
     
     except Exception as e:
         print(f"An error occurred while reading the file: {e}")
@@ -58,11 +58,11 @@ def convert_bam_to_fasta(in_file, out_file):
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         # Print the command output
-        print('\n' + "✅ Converted bam to fasta file successfully." + result.stdout.decode() + '\n')
+        print('\n' + "[Success] Converted bam to fasta file successfully." + result.stdout.decode() + '\n')
 
     except subprocess.CalledProcessError as e:
         # Print the error message if the command fails
-        print('\n' + "❌ Error running Samtools command:" + e.stderr.decode() + '\n')
+        print('\n' + "[Error] Error running Samtools command:" + e.stderr.decode() + '\n')
     
     finally:
         # Close spinner
@@ -84,11 +84,11 @@ def split_fasta_file(in_file, out_file):
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         # Print the command output
-        print('\n' + "✅ Fasta files split successfully." + result.stdout.decode() + '\n')
+        print('\n' + "[Success] Fasta files split successfully." + result.stdout.decode() + '\n')
 
     except subprocess.CalledProcessError as e:
         # Print the error message if the command fails
-        print('\n' + "❌ Error running Seqtk command:" + e.stderr.decode() + '\n')
+        print('\n' + "[Error] Error running Seqtk command:" + e.stderr.decode() + '\n')
 
     finally:
         # Close spinner
@@ -113,11 +113,11 @@ def index_fasta_file(in_file, out_file):
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         # Print the command output
-        print('\n' + "✅ .2bit from .fa file generated successfully." + result.stdout.decode() + '\n')
+        print('\n' + "[Success] .2bit from .fa file generated successfully." + result.stdout.decode() + '\n')
 
     except subprocess.CalledProcessError as e:
         # Print the error message if the command fails
-        print('\n' + "\n❌ Error running faToTwoBit: " + e.stderr.decode() + '\n')
+        print('\n' + "[Error] Error running faToTwoBit: " + e.stderr.decode() + '\n')
 
     finally:
         # Close spinner
@@ -139,11 +139,11 @@ def extract_sequences_of_interest(database_file, query_file, output_file):
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         # Print the command output
-        print('\n' + "✅ Extracted sequences with blat successfully.", result.stdout.decode())
+        print('\n' + "[Success] Extracted sequences with blat successfully.", result.stdout.decode())
 
     except subprocess.CalledProcessError as e:
         # Print the error message if the command fails
-        print('\n' + "❌ Error running BLAT command:" + e.stderr.decode() + '\n')
+        print('\n' + "[Error] Error running BLAT command:" + e.stderr.decode() + '\n')
 
     finally:
         # Close spinner
@@ -222,7 +222,7 @@ def extract_identifiers(filename):
     spinner.stop()
 
     # Print the command output
-    print(f"✅ Extracted sequence idenfifiers from {filename} successfully.")
+    print(f"[Success] Extracted sequence idenfifiers from {filename} successfully.")
 
     return identifiers
 
@@ -233,7 +233,7 @@ def append_list_of_identifiers(filename, identifiers):
         for identifier in identifiers:
             file.write(identifier + '\n')  # Write each identifier on a new line
     
-    print("\n✅ Added identifiers to " + filename + '\n')
+    print("\n[Success] Added identifiers to " + filename + '\n')
 
 # Use fasta identifiers to retrieve sequences in the original run that match them
 def match_sequences(in_file, identifiers_file, out_file):
@@ -252,11 +252,11 @@ def match_sequences(in_file, identifiers_file, out_file):
             result = subprocess.run(command, check=True, stdout=f, stderr=subprocess.PIPE)
     
         # Print the command output
-        print("\n✅ Matched sequences successfully.")
+        print("\n[Success] Matched sequences successfully.")
 
     except subprocess.CalledProcessError as e:
         # Print the error message if the command fails
-        print('\n' + "❌ Error running Seqtk command:" + e.stderr.decode() + '\n')
+        print('\n' + "[Error] Error running Seqtk command:" + e.stderr.decode() + '\n')
     
     finally:
         # Stop spinner
@@ -585,7 +585,7 @@ def sequence():
     # Command Usage: seqtk subseq STC654_Bio_Sample_8_flnc.fasta STC654_Bio_Sample_8_IGHG1.txt > IGHG1_seqs.fasta
     match_sequences(step1_out_file, step1_sequences_txt_file, step3_seqs_file)
 
-    print("\nProcess complete! 🎉")
+    print("\nProcess complete! [Success]")
 
 
 def igblast(species="rat"):
@@ -802,7 +802,7 @@ Choose a task to get started:
             if task_lowercase in task_options:
                 break
             else:
-                print('\n' + f"❌ Error: The option {task_lowercase} is not available."  + '\n')
+                print('\n' + f"[Error] Error: The option {task_lowercase} is not available."  + '\n')
         
         print('')
 
@@ -819,7 +819,7 @@ Choose a task to get started:
             immuneref()
 
     else: 
-        print('\n' + "❌ Error: could not find file targets.txt file with strain specific target options.")
+        print('\n' + "[Error] Error: could not find file targets.txt file with strain specific target options.")
 
 
 # Set strain specific target options global array

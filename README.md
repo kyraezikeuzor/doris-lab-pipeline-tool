@@ -16,8 +16,8 @@ Ensure that these tools are available on your system before starting.
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/username/Antibuddy.git
-   cd Antibuddy
+   git clone https://github.com/kyraezikeuzor/ig-buddy.git
+   cd ig-buddy
    ```
    
 2. Prepare a folder structure in the following format:
